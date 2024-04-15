@@ -1,0 +1,581 @@
+{
+      "name": "Selling Plans",
+      "type": "selling_plans",
+      "limit": 1,
+      "settings": [
+        {
+          "type": "text",
+          "id": "frequency_title",
+          "label": "Frequency Title",
+          "default": "Choose Frequency"
+        },
+        {
+          "type": "text",
+          "id": "thirty_day_title",
+          "label": "Title for 30 Days option",
+          "default": "1 Month Supply"
+        },
+        {
+          "type": "text",
+          "id": "sixty_day_title",
+          "label": "Title for 60 Days option",
+          "default": "2 Month Supply"
+        },
+        {
+          "type": "text",
+          "id": "one_month_title",
+          "label": "Title for 1 Month option",
+          "default": "1 Month Supply"
+        },
+        {
+          "type": "text",
+          "id": "two_month_title",
+          "label": "Title for 2 Month option",
+          "default": "2 Month Supply"
+        }
+
+      ]
+    },
+
+
+
+    // in product-form
+
+    {% when 'selling_plans' %}
+
+        {% liquid
+          capture label_classes
+            echo 'px-4 py-3 cursor-pointer'
+          endcapture
+          capture option_class
+            echo 'border-solid flex rounded-md border-2 border-primary text-primary uppercase font-bold flex-grow justify-center text-center opacity-60'
+          endcapture
+        %}
+
+        <purchase-options class="w-full purchase-options" client:idle {{ block.shopify_attributes }}>
+          <div class="flex flex-col gap-3">
+
+            <div class="flex flex-row gap-4">
+
+
+              <div class="{{ option_class }} sp-group-active " data-plan-group="selling_group_onetime">
+                <input
+                  type="radio"
+                  name="purchase_option"
+                  value="one_time"
+                  id="selling_group_onetime"
+                  data-plan-group="selling_group_onetime"
+                  data-price="{{ product.price | money }}"
+                  class="peer sr-only"
+                  checked>
+
+                <label for="selling_group_onetime" class="{{- label_classes -}}" data-plan-group="selling_group_onetime">
+                  <span>One Time</span>
+                  {% comment %} <span class="ml-auto">{{- product.price | money -}}</span> {% endcomment %}
+                </label>
+              </div>
+              {% for group in product.selling_plan_groups %}
+                {%- liquid
+                  assign plan_allocation = false
+                  assign current_variant = product.selected_or_first_available_variant
+                  
+                  for selling_plan_allocation in current_variant.selling_plan_allocations
+                    if group.id == selling_plan_allocation.selling_plan_group_id
+                      assign plan_allocation = selling_plan_allocation
+                      break
+                    endif
+                  endfor
+
+                  assign percentage_amount = false
+
+                  for price_adjustment in plan_allocation.selling_plan.price_adjustments
+                    assign percentage_amount = price_adjustment.value
+                    break
+                  endfor
+                -%}
+
+                <div class="{{ option_class }} {% if forloop.first %} {% endif %}" data-plan-group="selling_group_{{- group.id -}}_subscription">
+                  <input
+                    type="radio"
+                    name="purchase_option"
+                    value="subscription"
+                    data-plan-group="selling_group_{{- group.id -}}_subscription"
+                    id="selling_group_{{- group.id -}}_subscription"
+                    data-price="{{- plan_allocation.price | money -}}"
+                    class="peer sr-only">
+
+                  <label for="selling_group_{{- group.id -}}_subscription" class="{{- label_classes -}}">
+                    <span>Subscribe & Save {{ percentage_amount }}%</span>
+                  </label>
+                </div>
+              {%- endfor -%}
+
+
+            </div>
+
+            {% for group in product.selling_plan_groups %}
+              <div class="mt-3 flex gap-2.5 group-plans flex-col" data-plan="selling_group_{{- group.id -}}_subscription">
+
+                <h5 class="frequency-label my-0">{{ block.settings.frequency_title }}</h5>
+
+                <p class="text-[15px] text-rosemary hidden">Save {{ percentage_amount }}% when you subscribe. It's easy! Pause or cancel any time!</p>
+
+                {% for selling_plan in group.selling_plans %}
+                  <label
+                    class="pill-button {{ option_class }} {{ label_classes }} flex-row justify-between {% if forloop.first %}sp-plan-active {% endif %}"
+                    for="selling_group_{{- group.id -}}_plan_{{- selling_plan.id }}"
+                    data-plan-group="selling_group_{{- group.id -}}_subscription"
+                  >
+                    <input
+                      type="radio"
+                      data-plan-group="selling_group_{{- group.id -}}_subscription"
+                      name="purchase_option_values"
+                      value="{{- selling_plan.id -}}"
+                      id="selling_group_{{- group.id -}}_plan_{{- selling_plan.id }}"
+                      class="peer sr-only"
+                      {% if forloop.first %}
+                        checked
+                        {%- assign first_plan_id = selling_plan.id -%}
+                        {%- assign first_plan_compare_price. = plan_allocation.compare_at_price -%}
+                        {%- assign first_plan_price = plan_allocation.price -%}
+                      {% endif %}
+                    >
+                    <div class="grid grid-cols-2 w-full align-middle items-center">
+                      {% if selling_plan.options.first.value contains '30' %}
+                        {{ block.settings.thirty_day_title }}
+                      {% elsif selling_plan.options.first.value contains '60' %}
+                        {{ block.settings.sixty_day_title }}
+                      {% else %}
+                        {{- selling_plan.name -}}
+                      {% endif %}
+                      <div class="sp-prices">          
+                        <span class="ml-2 line-through opacity-60 font-normal">{{- product.price | money -}}</span>
+                        <span class="ml-auto font-bold">{{- plan_allocation.price | money -}}</span>
+                      </div>
+                      <div class="sp-plan-desc empty:hidden">
+                        {{- selling_plan.description -}}
+                      </div>
+                      <div class="sp-plan-savings">
+                        Save {{ selling_plan.price_adjustments.first.value }}%
+                      </div>
+                      <div class="sp-plan-name">
+                        {{ selling_plan.name }}
+                      </div>
+                    </div>
+                  </label>
+                {% endfor %}
+              </div>
+            {%- endfor -%}
+          {% if block.settings.default %}
+            <input type="hidden" name="selling_plan" value="{{ first_plan_id }}" form="{{ product_form_id }}">
+          {% else %}      
+            <input type="hidden" name="selling_plan" value="" form="{{ product_form_id }}">
+          {% endif %}
+          
+          </div>
+        </purchase-options>
+
+        <script>
+          class PurchaseOptions extends HTMLElement {
+            constructor() {
+              super();
+
+              this.input = this.querySelector('input[name="selling_plan"]');
+              this.options = this.querySelectorAll('input[name="purchase_option"]');
+              this.planButtons = this.querySelectorAll('.pill-button');
+              this.planDivs = this.querySelectorAll('.group-plans');
+
+              this.options.forEach((option) =>
+                option.addEventListener('click', this.onRadioChange.bind(this))
+              );
+
+              this.planButtons.forEach((button) =>
+                button.addEventListener('click', this.onPlanButtonClick.bind(this))
+              );
+
+            }
+
+            onRadioChange(e) {
+              const groupName = e.target.getAttribute('data-plan-group');
+              const isSubscription = e.target.value === 'subscription';
+              this.togglePlanDiv(groupName, isSubscription);
+              const selectedPlanId = this.getSelectValue(groupName);
+              this.input.value = isSubscription ? selectedPlanId : '';
+              this.toggleActiveClass(groupName, isSubscription);
+
+              // Automatically select the first plan in the group when a group is selected
+              if (isSubscription && selectedPlanId === '') {
+                const firstPlanButton = this.querySelector(`.pill-button[data-plan-group="${groupName}"]`);
+                if (firstPlanButton) {
+                  const firstPlanId = firstPlanButton.querySelector('input[name="purchase_option_values"]').value;
+                  firstPlanButton.classList.add('sp-plan-active');
+                  this.input.value = firstPlanId;
+                }
+              }
+
+              this.updateDisplayedPrice();
+            }
+
+            onPlanButtonClick(e) {
+              const groupName = e.target.getAttribute('data-plan-group');
+              const labelElement = e.target.closest('label');
+              console.log("labelElement", labelElement)
+              
+              if (labelElement) {
+                console.log("labelElement", labelElement)
+                labelElement.classList.add('sp-plan-active'); 
+              }
+
+              console.log(e.target)
+              const inputElement = e.target.querySelector('input[name="purchase_option_values"]');
+              const planId = inputElement ? inputElement.value : e.target.value;
+              const inputFor = inputElement ? inputElement.getAttribute('for') : e.target.getAttribute('for');
+              this.input.value = planId;
+              this.toggleActiveClass(groupName, false, labelElement);
+
+              this.updateDisplayedPrice();
+
+            }
+
+              updateDisplayedPrice() {
+                const selectedOption = this.querySelector('input[name="purchase_option"]:checked');
+                const price = selectedOption ? selectedOption.getAttribute('data-price') : '';
+                
+                // Update the displayed price in the document
+                const priceElements = document.querySelectorAll('[data-product-price-list] .price');
+                priceElements.forEach((priceElement) => {
+                  priceElement.textContent = price;
+                });
+              }
+
+            togglePlanDiv(groupName, show) {
+              this.planDivs.forEach((div) => {
+                const divGroupName = div.getAttribute('data-plan');
+                // div.style.display = divGroupName === groupName && show ? 'flex' : 'none';
+                const isVisible = divGroupName === groupName && show;
+                div.classList.toggle('visible', isVisible);
+              });
+            }
+
+            toggleActiveClass(groupName, isSubscription, labelElement) {
+              
+              this.options.forEach((option) => {
+                const optionGroupName = option.getAttribute('id');
+                const isActiveGroup = optionGroupName === groupName;
+                option.parentElement.classList.toggle('sp-group-active', isActiveGroup);
+              });
+
+              this.planButtons.forEach((button) => {
+                const buttonGroupName = button.getAttribute('for');
+                const isActivePlan = button === labelElement;
+                button.classList.toggle('sp-plan-active', isActivePlan);
+              });
+            }
+
+            getSelectValue(groupName) {
+              const select = this.querySelector(`select[name="purchase_option_values"]`);
+              return select ? select.value : '';
+            }
+          }
+
+          customElements.define('purchase-options', PurchaseOptions);
+        </script>
+
+
+<!-- add css -->
+.sr-only{
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0
+}
+
+.visible{
+  visibility: visible
+}
+
+.absolute{
+  position: absolute
+}
+
+.relative{
+  position: relative
+}
+
+.sticky{
+  position: sticky
+}
+
+.float-left{
+  float: left
+}
+
+.my-0{
+  margin-top: 0px;
+  margin-bottom: 0px
+}
+
+.mb-10{
+  margin-bottom: 2.5rem
+}
+
+.ml-2{
+  margin-left: 0.5rem
+}
+
+.ml-auto{
+  margin-left: auto
+}
+
+.mt-3{
+  margin-top: 0.75rem
+}
+
+.block{
+  display: block
+}
+
+.inline{
+  display: inline
+}
+
+.flex{
+  display: flex
+}
+
+.grid{
+  display: grid
+}
+
+.hidden{
+  display: none
+}
+
+.w-full{
+  width: 100%
+}
+
+.flex-grow{
+  flex-grow: 1
+}
+
+.transform{
+  transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))
+}
+
+.cursor-pointer{
+  cursor: pointer
+}
+
+.grid-cols-2{
+  grid-template-columns: repeat(2, minmax(0, 1fr))
+}
+
+.flex-row{
+  flex-direction: row
+}
+
+.flex-col{
+  flex-direction: column
+}
+
+.flex-wrap{
+  flex-wrap: wrap
+}
+
+.items-center{
+  align-items: center
+}
+
+.justify-center{
+  justify-content: center
+}
+
+.justify-between{
+  justify-content: space-between
+}
+
+.gap-2{
+  gap: 0.5rem
+}
+
+.gap-2\.5{
+  gap: 0.625rem
+}
+
+.gap-3{
+  gap: 0.75rem
+}
+
+.gap-4{
+  gap: 1rem
+}
+
+.truncate{
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap
+}
+
+.rounded-md{
+  border-radius: 0.375rem
+}
+
+.border-2{
+  border-width: 2px
+}
+
+.border-solid{
+  border-style: solid
+}
+
+.border-primary{
+  --tw-border-opacity: 1;
+  border-color: rgb(210 173 115 / var(--tw-border-opacity))
+}
+
+.px-4{
+  padding-left: 1rem;
+  padding-right: 1rem
+}
+
+.py-3{
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem
+}
+
+.text-center{
+  text-align: center
+}
+
+.align-middle{
+  vertical-align: middle
+}
+
+.text-\[15px\]{
+  font-size: 15px
+}
+
+.font-bold{
+  font-weight: 700
+}
+
+.font-normal{
+  font-weight: 400
+}
+
+.uppercase{
+  text-transform: uppercase
+}
+
+.capitalize{
+  text-transform: capitalize
+}
+
+.italic{
+  font-style: italic
+}
+
+.text-primary{
+  --tw-text-opacity: 1;
+  color: rgb(210 173 115 / var(--tw-text-opacity))
+}
+
+.line-through{
+  text-decoration-line: line-through
+}
+
+.opacity-60{
+  opacity: 0.6
+}
+
+.filter{
+  filter: var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow)
+}
+
+.transition{
+  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, -webkit-backdrop-filter;
+  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter;
+  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter, -webkit-backdrop-filter;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms
+}
+
+.sp-group-active{
+  --tw-bg-opacity: 1;
+  background-color: rgb(251 245 237 / var(--tw-bg-opacity));
+  opacity: 1
+}
+
+.sp-prices *{
+  font-family: 'Pangram';
+  float: right
+}
+
+.sp-plan-savings{
+  margin-top: 0.25rem;
+  max-width: -moz-fit-content;
+  max-width: fit-content;
+  border-radius: 9999px;
+  --tw-bg-opacity: 1;
+  background-color: rgb(211 174 102 / var(--tw-bg-opacity));
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+  font-weight: 600;
+  color: white
+}
+
+.purchase-options{
+  margin-top: 1rem;
+  margin-bottom: 1rem
+}
+
+.sp-plan-name {
+  text-align: right;
+}
+
+.group-plans {
+  opacity: 0;
+  height: 0;
+  transition: opacity 0s ease-in-out, height 0.4s 0.4s ease-in-out;
+}
+
+.group-plans.visible {
+  opacity: 1;
+  height: auto;
+  transition: opacity 0.2s ease-in-out, height 0.4s 0.4s ease-in-out;
+}
+
+.pill-button {
+  color: var(--root-text-color);
+  border: none;
+  opacity: 1;
+  text-transform: none;
+  font-family: 'Pangram';
+  text-align: left;
+  outline-style: solid;
+  outline-width: 1px;
+  outline-color: #D2AD73
+}
+
+.sp-plan-active{
+  border-width: 2px;
+  text-align: left;
+  outline-width: 2px
+}
+
+h5.frequency-label.my-0 {
+  line-height: 1;
+  font-size: 18px;
+}
+
+.empty\:hidden:empty{
+  display: none
+}
